@@ -2500,7 +2500,26 @@ Secondary Interface %s :: IPv4: (%s, %s), IPv6: (%s, %s)`, helpers.DualStackSupp
 				})
 
 				SkipContextIf(func() bool { return helpers.DoesNotRunOnNetNextKernel() || helpers.DoesNotExistNodeWithoutCilium() },
-					"Tests with Wireguard (L2-less)", func() {
+					"Tests with native Wireguard (L2-less)", func() {
+						It("Tests NodePort SNAT from outside", func() {
+							var data v1.Service
+							err := kubectl.Get(helpers.DefaultNamespace, "service test-nodeport").Unmarshal(&data)
+							Expect(err).Should(BeNil(), "Cannot retrieve service")
+
+							DeployCiliumOptionsAndDNS(kubectl, ciliumFilename, map[string]string{
+								"tunnel":               "disabled",
+								"autoDirectNodeRoutes": "true",
+								"wireguard.enabled":    "true",
+							})
+
+							url := getHTTPLink(k8s1IP, data.Spec.Ports[0].NodePort)
+							testCurlFromOutside(url, 10, false)
+						})
+
+					})
+
+				SkipContextIf(func() bool { return helpers.DoesNotRunOnNetNextKernel() || helpers.DoesNotExistNodeWithoutCilium() },
+					"Tests with Wireguard (L2-less, kube-wireguarder)", func() {
 						var wgYAML string
 
 						BeforeAll(func() {
